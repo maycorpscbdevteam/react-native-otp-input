@@ -17,15 +17,15 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
         selectionColor: '#000',
     }
 
-    private fields: TextInput[] | null[] = []
+    private fields: TextInput[] | null[] = [];
     private keyboardDidHideListener?: EmitterSubscription;
     private timer?: NodeJS.Timeout;
     private hasCheckedClipBoard?: boolean;
     private clipBoardCode?: string;
 
     constructor(props: InputProps) {
-        super(props)
-        const { code } = props
+        super(props);
+        const { code } = props;
         this.state = {
             digits: codeToArray(code),
             selectedIndex: 0,
@@ -33,123 +33,124 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
     }
 
     UNSAFE_componentWillReceiveProps(nextProps: InputProps) {
-        const { code } = this.props
+        const { code } = this.props;
         if (nextProps.code !== code) {
-            this.setState({ digits: codeToArray(nextProps.code) })
+            this.setState({ digits: codeToArray(nextProps.code) });
         }
     }
 
     componentDidMount() {
-        this.copyCodeFromClipBoardOnAndroid()
-        this.bringUpKeyBoardIfNeeded()
-        this.keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', this.handleKeyboardDidHide)
+        this.copyCodeFromClipBoardOnAndroid();
+        this.keyboardDidHideListener = Keyboard.addListener('keyboardDidHide', this.handleKeyboardDidHide);
+        // Fix error don't auto focus input on load
+        setTimeout(this.bringUpKeyBoardIfNeeded, 150);
     }
 
     componentWillUnmount() {
         if (this.timer) {
-            clearInterval(this.timer)
+            clearInterval(this.timer);
         }
-        this.keyboardDidHideListener?.remove()
+        this.keyboardDidHideListener?.remove();
     }
 
     private copyCodeFromClipBoardOnAndroid = () => {
         if (Platform.OS === "android") {
-            this.checkPinCodeFromClipBoard()
-            this.timer = setInterval(this.checkPinCodeFromClipBoard, 400)
+            this.checkPinCodeFromClipBoard();
+            this.timer = setInterval(this.checkPinCodeFromClipBoard, 400);
         }
     }
 
     bringUpKeyBoardIfNeeded = () => {
-        const { autoFocusOnLoad, pinCount } = this.props
-        const digits = this.getDigits()
-        const focusIndex = digits.length ? digits.length - 1 : 0
+        const { autoFocusOnLoad, pinCount } = this.props;
+        const digits = this.getDigits();
+        const focusIndex = digits.length ? digits.length - 1 : 0;
         if (focusIndex < pinCount && autoFocusOnLoad) {
-            this.focusField(focusIndex)
+            this.focusField(focusIndex);
         }
     }
 
     getDigits = () => {
-        const { digits: innerDigits } = this.state
-        const { code } = this.props
-        return code === undefined ? innerDigits : code.split("")
+        const { digits: innerDigits } = this.state;
+        const { code } = this.props;
+        return code === undefined ? innerDigits : code.split("");
     }
 
     private handleKeyboardDidHide = () => {
-        this.blurAllFields()
+        this.blurAllFields();
     }
 
     private notifyCodeChanged = () => {
-        const { digits } = this.state
-        const code = digits.join("")
-        const { onCodeChanged } = this.props
+        const { digits } = this.state;
+        const code = digits.join("");
+        const { onCodeChanged } = this.props;
         if (onCodeChanged) {
-            onCodeChanged(code)
+            onCodeChanged(code);
         }
     }
 
     checkPinCodeFromClipBoard = () => {
-        const { pinCount, onCodeFilled } = this.props
-        const regexp = new RegExp(`^\\d{${pinCount}}$`)
+        const { pinCount, onCodeFilled } = this.props;
+        const regexp = new RegExp(`^\\d{${pinCount}}$`);
         Clipboard.getString().then(code => {
             if (this.hasCheckedClipBoard && regexp.test(code) && (this.clipBoardCode !== code)) {
                 this.setState({
                     digits: code.split(""),
                 }, () => {
-                    this.blurAllFields()
-                    this.notifyCodeChanged()
-                    onCodeFilled && onCodeFilled(code)
+                    this.blurAllFields();
+                    this.notifyCodeChanged();
+                    onCodeFilled && onCodeFilled(code);
                 })
             }
-            this.clipBoardCode = code
-            this.hasCheckedClipBoard = true
+            this.clipBoardCode = code;
+            this.hasCheckedClipBoard = true;
         }).catch(() => {
-        })
+        });
     }
 
     private handleChangeText = (index: number, text: string) => {
-        const { onCodeFilled, pinCount } = this.props
-        const digits = this.getDigits()
-        let newdigits = digits.slice()
-        const oldTextLength = newdigits[index] ? newdigits[index].length : 0
-        const newTextLength = text.length
+        const { onCodeFilled, pinCount } = this.props;
+        const digits = this.getDigits();
+        let newdigits = digits.slice();
+        const oldTextLength = newdigits[index] ? newdigits[index].length : 0;
+        const newTextLength = text.length;
         if (newTextLength - oldTextLength === pinCount) { // user pasted text in.
-            newdigits = text.split("").slice(oldTextLength, newTextLength)
-            this.setState({ digits: newdigits }, this.notifyCodeChanged)
+            newdigits = text.split("").slice(oldTextLength, newTextLength);
+            this.setState({ digits: newdigits }, this.notifyCodeChanged);
         } else {
             if (text.length === 0) {
                 if (newdigits.length > 0) {
-                    newdigits = newdigits.slice(0, newdigits.length - 1)
+                    newdigits = newdigits.slice(0, newdigits.length - 1);
                 }
             } else {
                 text.split("").forEach((value) => {
-                    if(index < pinCount) {
+                    if (index < pinCount) {
                         newdigits[index] = value;
                         index += 1;
                     }
                 })
-                index -= 1
+                index -= 1;
             }
-            this.setState({ digits: newdigits }, this.notifyCodeChanged)
+            this.setState({ digits: newdigits }, this.notifyCodeChanged);
         }
 
-        let result = newdigits.join("")
+        let result = newdigits.join("");
         if (result.length >= pinCount) {
-            onCodeFilled && onCodeFilled(result)
-            this.focusField(pinCount - 1)
-            this.blurAllFields()
+            onCodeFilled && onCodeFilled(result);
+            this.focusField(pinCount - 1);
+            this.blurAllFields();
         } else {
             if (text.length > 0 && index < pinCount - 1) {
-                this.focusField(index + 1)
+                this.focusField(index + 1);
             }
         }
     }
 
     private handleKeyPressTextInput = (index: number, key: string) => {
-        const digits = this.getDigits()
         if (key === 'Backspace') {
-            if (!digits[index] && index > 0) {
-                this.handleChangeText(index - 1, '')
-                this.focusField(index - 1)
+            if (index > 0) {
+                this.handleChangeText(index - 1, '');
+                const focusIndex = this.getDigits()[index] ? index : index - 1;
+                this.focusField(focusIndex);
             }
         }
     }
@@ -164,7 +165,7 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
     }
 
     blurAllFields = () => {
-        this.fields.forEach((field: TextInput | null) => (field as TextInput).blur())
+        this.fields.forEach((field: TextInput | null) => (field as TextInput).blur());
         this.setState({
             selectedIndex: -1,
         })
@@ -174,16 +175,16 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
     clearAllFields = () => {
         const { clearInputs, code } = this.props;
         if (clearInputs && code === "") {
-            this.setState({ digits: [], selectedIndex: 0 })
+            this.setState({ digits: [], selectedIndex: 0 });
         }
     }
 
     renderOneInputField = (_: TextInput, index: number) => {
-        const { codeInputFieldStyle, codeInputHighlightStyle, secureTextEntry, keyboardType, selectionColor } = this.props
-        const { defaultTextFieldStyle } = styles
-        const { selectedIndex, digits } = this.state
-        const { clearInputs, placeholderCharacter, placeholderTextColor } = this.props
-        const { color: defaultPlaceholderTextColor } = { ...defaultTextFieldStyle, ...codeInputFieldStyle }
+        const { codeInputFieldStyle, codeInputHighlightStyle, secureTextEntry, keyboardType, selectionColor } = this.props;
+        const { defaultTextFieldStyle } = styles;
+        const { selectedIndex, digits } = this.state;
+        const { clearInputs, placeholderCharacter, placeholderTextColor } = this.props;
+        const { color: defaultPlaceholderTextColor } = { ...defaultTextFieldStyle, ...codeInputFieldStyle };
         return (
             <View pointerEvents="none" key={index + "view"} testID="inputSlotView">
                 <TextInput
@@ -192,10 +193,13 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
                     style={selectedIndex === index ? [defaultTextFieldStyle, codeInputFieldStyle, codeInputHighlightStyle] : [defaultTextFieldStyle, codeInputFieldStyle]}
                     ref={ref => { this.fields[index] = ref }}
                     onChangeText={text => {
-                        this.handleChangeText(index, text)
+                        // Don't update text if is empty or backspace
+                        if (text.length > 0) {
+                            this.handleChangeText(index, text);
+                        }
                     }}
                     onKeyPress={({ nativeEvent: { key } }) => { this.handleKeyPressTextInput(index, key) }}
-                    value={ !clearInputs ? digits[index]: "" }
+                    value={!clearInputs ? digits[index] : ""}
                     keyboardType={keyboardType}
                     textContentType={isAutoFillSupported ? "oneTimeCode" : "none"}
                     key={index}
@@ -203,20 +207,22 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
                     secureTextEntry={secureTextEntry}
                     placeholder={placeholderCharacter}
                     placeholderTextColor={placeholderTextColor || defaultPlaceholderTextColor}
+                    returnKeyType="done"
+                    maxLength={1}
                 />
             </View>
         )
     }
 
     renderTextFields = () => {
-        const { pinCount } = this.props
-        const array = new Array(pinCount).fill(0)
-        return array.map(this.renderOneInputField)
+        const { pinCount } = this.props;
+        const array = new Array(pinCount).fill(0);
+        return array.map(this.renderOneInputField);
     }
 
     render() {
-        const { pinCount, style, clearInputs } = this.props
-        const digits = this.getDigits()
+        const { pinCount, style, clearInputs } = this.props;
+        const digits = this.getDigits();
         return (
             <View
                 testID="OTPInputView"
@@ -226,11 +232,11 @@ export default class OTPInputView extends Component<InputProps, OTPInputViewStat
                     style={{ width: '100%', height: '100%' }}
                     onPress={() => {
                         if (!clearInputs) {
-                            let filledPinCount = digits.filter((digit) => { return (digit !== null && digit !== undefined) }).length
-                            this.focusField(Math.min(filledPinCount, pinCount - 1))
+                            let filledPinCount = digits.filter((digit) => { return (digit !== null && digit !== undefined) }).length;
+                            this.focusField(Math.min(filledPinCount, pinCount - 1));
                         } else {
                             this.clearAllFields();
-                            this.focusField(0)
+                            this.focusField(0);
                         }
                     }}
                 >
